@@ -5,8 +5,8 @@
 #include <linux/uaccess.h>
 
 // Module metadata
-MODULE_AUTHOR("Ruan de Bruyn");
-MODULE_DESCRIPTION("Hello world driver");
+MODULE_AUTHOR("lumenthi");
+MODULE_DESCRIPTION("Controller");
 MODULE_LICENSE("GPL");
 
 /* Define these values to match your devices */
@@ -58,16 +58,20 @@ static void int_in_callback(struct urb *urb)
 {
 	struct usb_skel *dev = urb->context;
 	
-	printk(KERN_INFO "[+][+][+] Interrupt in callback\n");
+	// printk(KERN_INFO "[+][+][+] Interrupt in callback\n");
 	if (urb->status)
 		if (urb->status == -ENOENT ||
 		    urb->status == -ECONNRESET ||
 		    urb->status == -ESHUTDOWN)
 			printk(KERN_INFO "Error submitting in urb\n");
-	printk(KERN_INFO "[~] Length: %d\n", urb->actual_length);
+	// printk(KERN_INFO "[~] Length: %d\n", urb->actual_length);
 	if (urb->actual_length > 0) {
-		printk(KERN_INFO "[~] Received data: 0x%x\n", *(int *)dev->int_in_buffer);
+		// printk(KERN_INFO "[~] Received data: 0x%x\n", *(int *)dev->int_in_buffer);
 	}
+	dev->int_in_size = urb->actual_length;
+
+	/* Resubmitting urb */
+	usb_submit_urb(dev->int_in_urb, GFP_ATOMIC);
 }
 
 static int skel_open(struct inode *inode, struct file *file)
@@ -117,13 +121,16 @@ static int skel_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t skel_read(struct file *file, char *buffer, size_t count, loff_t *ppos)
+static ssize_t skel_read(struct file *file, char *user_buffer, size_t count, loff_t *ppos)
 {
 	struct usb_skel *dev;
 
-	printk(KERN_INFO "[~] Reading the I/0 device\n");
+	// printk(KERN_INFO "[~] Reading the I/0 device\n");
 	dev = (struct usb_skel *)file->private_data;
-	return 0;
+	if (copy_to_user(user_buffer, dev->int_in_buffer, dev->int_in_size)) {
+		printk(KERN_INFO "[!] Copy_to_user error when reading the device\n");
+	}
+	return dev->int_in_size;
 }
 
 static ssize_t skel_write(struct file *file, const char *user_buffer, size_t count, loff_t *ppos)
@@ -182,37 +189,6 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 {
 	struct usb_skel 		*dev;
 	struct usb_host_interface *iface_desc;
-	/*
-		struct usb_host_interface {
-			struct usb_interface_descriptor		desc {
-				__u8  bLength;
-				__u8  bDescriptorType;
-				__u8  bInterfaceNumber;
-				__u8  bAlternateSetting;
-				__u8  bNumEndpoints;
-				__u8  bInterfaceClass;
-				__u8  bInterfaceSubClass;
-				__u8  bInterfaceProtocol;
-				__u8  iInterface;
-			};
-			int 					extralen;
-			unsigned char 				*extra;   * Extra descriptors *
-			struct usb_host_endpoint 		*endpoint {
-				struct usb_endpoint_descriptor		desc;
-				struct usb_ss_ep_comp_descriptor	ss_ep_comp;
-				struct usb_ssp_isoc_ep_comp_descriptor	ssp_isoc_ep_comp;
-				struct list_head			urb_list;
-				void					*hcpriv;
-				struct ep_device			*ep_dev;
-				unsigned char 				*extra; * Extra descriptors *
-				int 					extralen;
-				int 					enabled;
-				int 					streams;
-			};
-			char 					*string; * iInterface string, if present * 
-			
-		}
-	*/
 	struct usb_endpoint_descriptor *endpoint;
 	size_t buffer_size;
 	int i;
@@ -302,7 +278,23 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 
 static void skel_disconnect(struct usb_interface *interface)
 {
+	struct usb_skel *dev;
+
+	dev = usb_get_intfdata(interface);
+
+	/* Freeing urbs */
+	if (dev->int_in_urb) {
+		printk(KERN_INFO "[-] Freeing interrupt in urb\n");
+		usb_free_urb(dev->int_in_urb);
+	}
+	if (dev->int_out_urb) {
+		printk(KERN_INFO "[-] Freeing interrupt out urb\n");
+		usb_free_urb(dev->int_out_urb);
+	}
+
 	usb_deregister_dev(interface, &skel_class);
+	dev->interface = NULL;
+	kfree(dev);
 	printk(KERN_INFO "[-][-][-] Device unplugged.\n");
 }
 
