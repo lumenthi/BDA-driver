@@ -147,8 +147,16 @@ static struct file_operations skel_fops = {
 	.release =	skel_release,
 };
 
+char	*device_permissions(struct device *dev, umode_t *mode)
+{
+	if (mode)
+		(*mode) = 0666; /* RW */
+	return kasprintf(GFP_KERNEL, "usb/%s", dev_name(dev));
+}
+
 static struct usb_class_driver skel_class = {
 	.name =		"skel%d",
+	.devnode = 	device_permissions,
 	.fops =		&skel_fops,
 	.minor_base =	USB_SKEL_MINOR_BASE,
 };

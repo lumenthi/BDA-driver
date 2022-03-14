@@ -7,6 +7,7 @@ all:
 
 clean:
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+	rm -f api_tests
 
 load: all
 	sudo rmmod usbhid || true # All USB HID devices are managed by usbhid driver, we must remove it.
@@ -23,4 +24,7 @@ log:
 	sudo tail -F /var/log/messages
 
 read:
-	sudo cat /dev/skel0 #We assume that we are skel0
+	sudo cat /dev/usb/skel0 | xxd #We assume that we are skel0
+
+api:
+	gcc controller_api.c -o api_tests && ./api_tests
