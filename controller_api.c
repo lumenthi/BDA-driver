@@ -39,7 +39,7 @@ int 	main(int argc, char **argv)
 		}
 	}
 	if (close(fd) < 0)
-		printf("Close failed.\n");
+		fprintf(stderr, "%s", "Close failed.\n");
 	printf("\nCaught signal, interrupting execution.\n");
 	return 0;
 }
