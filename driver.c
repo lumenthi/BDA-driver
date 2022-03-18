@@ -4,6 +4,9 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 
+#include <linux/input.h>
+#include <linux/usb/input.h>
+
 /* Module metadata */
 MODULE_AUTHOR("lumenthi");
 MODULE_DESCRIPTION("BDA Controller");
@@ -29,6 +32,9 @@ struct usb_skel {
 	struct usb_interface		*interface;
 	struct kref			kref;
 
+	struct input_dev 		*idev;
+	char 				phys[64];
+
 	size_t				int_in_size;
 	struct urb 			*int_in_urb;
 	struct urb 			*int_out_urb;
@@ -39,6 +45,22 @@ struct usb_skel {
 	unsigned char           	*int_in_buffer;
 	unsigned char           	*int_out_buffer;
 };
+
+static const signed short common_btn[] = {
+	BTN_A, BTN_B, BTN_X, BTN_Y,			/* "analog" buttons */
+	-1						/* terminating entry */
+};
+
+static void process_packet(struct usb_skel *dev, struct urb *urb, unsigned char *data)
+{
+	// Keys 	-> input_report_key(dev, BTN_A, ?);
+	// Sticks 	-> input_report_abs(dev, ABS_RX, ?);
+	//		-> input_report_abs(dev, ABS_RY, ?);
+	input_report_key(dev->idev, BTN_Y, *(int*)data & 0x01);
+	input_report_key(dev->idev, BTN_B, *(int*)data & 0x02);
+	input_report_key(dev->idev, BTN_A, *(int*)data & 0x04);
+	input_report_key(dev->idev, BTN_X, *(int*)data & 0x06);
+}
 
 static void int_in_callback(struct urb *urb)
 {
@@ -57,6 +79,8 @@ static void int_in_callback(struct urb *urb)
 		// printk(KERN_INFO "[~] Received data: 0x%x\n", *(int *)dev->int_in_buffer);
 	}
 	dev->int_in_size = urb->actual_length;
+
+	process_packet(dev, urb, dev->int_in_buffer);
 
 	/* Resubmitting urb */
 	usb_submit_urb(dev->int_in_urb, GFP_ATOMIC);
@@ -233,14 +257,21 @@ static int error_handler(struct usb_skel **u_dev)
 	return -1;
 }
 
+static int init_input(struct usb_skel **gdev)
+{
+	struct usb_skel *dev = *gdev;
+	return 0;
+}
+
 static int skel_probe(struct usb_interface *interface, const struct usb_device_id *id)
 {
 	struct usb_skel 		*dev;
-	struct usb_host_interface *iface_desc;
-	struct usb_endpoint_descriptor *endpoint;
-	size_t buffer_size;
-	int i;
-	int retval = -ENOMEM;
+	struct usb_host_interface 	*iface_desc;
+	struct usb_endpoint_descriptor 	*endpoint;
+	struct	input_dev		*input_dev;
+	size_t 				buffer_size;
+	int 				i;
+	int 				retval = -ENOMEM;
 
 	printk(KERN_INFO "[+][+][+] Device plugged in.\n");
 
@@ -256,6 +287,36 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	dev->udev = usb_get_dev(interface_to_usbdev(interface));
 	dev->interface = interface;
 
+	/* Init input structure */
+	printk(KERN_INFO "[~] Allocating input device\n");
+	input_dev = input_allocate_device();
+	if (!input_dev) {
+		printk(KERN_INFO "[!] Can't allocate input device\n");
+		/* TODO: Handle input_structure idev in error handler */
+		return error_handler(&dev);
+	}
+
+	dev->idev = input_dev;
+
+	input_dev->name = "BDA Controller";
+	input_dev->phys = dev->phys;
+
+	usb_make_path(dev->udev, dev->phys, sizeof(dev->phys));
+	strlcat(dev->phys, "/BDAinput", sizeof(dev->phys));
+
+	input_dev->id.vendor = USB_SKEL_VENDOR_ID;
+	input_dev->id.product = USB_SKEL_PRODUCT_ID;
+
+	usb_to_input_id(dev->udev, &input_dev->id);
+	for (i = 0; common_btn[i] >= 0; i++)
+		input_set_capability(input_dev, EV_KEY, common_btn[i]);
+	retval = input_register_device(dev->idev);
+	if (retval) {
+		printk(KERN_INFO "[!] Can't register input device\n");
+		return error_handler(&dev);
+	}
+
+	i = 0;
 	/* Set up the endpoint information */
 	/* Use only the first int-in and int-out endpoints */
 	iface_desc = interface->cur_altsetting;
@@ -328,6 +389,12 @@ static void skel_disconnect(struct usb_interface *interface)
 	struct usb_skel *dev;
 
 	dev = usb_get_intfdata(interface);
+
+	/* Freeing device */
+	if (dev->idev) {
+		printk(KERN_INFO "[-] Freeing input device\n");
+		input_unregister_device(dev->idev);
+	}
 
 	/* Freeing urbs */
 	if (dev->int_in_urb) {
