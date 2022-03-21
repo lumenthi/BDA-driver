@@ -28,3 +28,6 @@ read:
 
 api:
 	gcc controller_api.c -o api_tests && ./api_tests
+
+jstest:
+	bash test.sh

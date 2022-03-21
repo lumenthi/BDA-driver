@@ -46,20 +46,44 @@ struct usb_skel {
 	unsigned char           	*int_out_buffer;
 };
 
-static const signed short common_btn[] = {
-	BTN_A, BTN_B, BTN_X, BTN_Y,			/* "analog" buttons */
-	-1						/* terminating entry */
-};
+/* Common buttons */
+static const signed short bda_buttons[] = {BTN_A,BTN_B,BTN_X,BTN_Y,-1};
+/* Special buttons */
+/*				             HOME    PLUS       LESS         PAIR */
+static const signed short bda_sbuttons[] = {BTN_MODE,BTN_START,BTN_SELECT,BTN_EXTRA,-1};
+/* Triggers */
+static const signed short bda_triggers[] = {BTN_TL,BTN_TR,BTN_TL2,BTN_TR2,-1};
+/* D-Pad */
+static const signed short bda_dpad[] = {BTN_TRIGGER_HAPPY1,BTN_TRIGGER_HAPPY2,BTN_TRIGGER_HAPPY3,BTN_TRIGGER_HAPPY4, -1};
+
+#define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 
 static void process_packet(struct usb_skel *dev, struct urb *urb, unsigned char *data)
 {
-	// Keys 	-> input_report_key(dev, BTN_A, ?);
-	// Sticks 	-> input_report_abs(dev, ABS_RX, ?);
-	//		-> input_report_abs(dev, ABS_RY, ?);
-	input_report_key(dev->idev, BTN_Y, *(int*)data & 0x01);
-	input_report_key(dev->idev, BTN_B, *(int*)data & 0x02);
-	input_report_key(dev->idev, BTN_A, *(int*)data & 0x04);
-	input_report_key(dev->idev, BTN_X, *(int*)data & 0x06);
+
+	// printk(KERN_INFO "[~] Processing packet: 0x%llx\n", *(uint64_t*)data);
+
+	/* Reporting common buttons */
+	input_report_key(dev->idev, BTN_Y, CHECK_BIT(*(uint64_t*)data, 0));
+	input_report_key(dev->idev, BTN_B, CHECK_BIT(*(uint64_t*)data, 1));
+	input_report_key(dev->idev, BTN_A, CHECK_BIT(*(uint64_t*)data, 2));
+	input_report_key(dev->idev, BTN_X, CHECK_BIT(*(uint64_t*)data, 3));
+
+	/* Reporting triggers */
+	input_report_key(dev->idev, BTN_TL, CHECK_BIT(*(uint64_t*)data, 4));
+	input_report_key(dev->idev, BTN_TR, CHECK_BIT(*(uint64_t*)data, 5));
+	input_report_key(dev->idev, BTN_TL2, CHECK_BIT(*(uint64_t*)data, 6));
+	input_report_key(dev->idev, BTN_TR2, CHECK_BIT(*(uint64_t*)data, 7));
+
+	/* Reporting D-PAD */
+
+	/* Reporting special buttons */
+	input_report_key(dev->idev, BTN_SELECT, CHECK_BIT(*(uint64_t*)data, 8));
+	input_report_key(dev->idev, BTN_START, CHECK_BIT(*(uint64_t*)data, 9));
+	input_report_key(dev->idev, BTN_MODE, CHECK_BIT(*(uint64_t*)data, 12));
+	input_report_key(dev->idev, BTN_EXTRA, CHECK_BIT(*(uint64_t*)data, 13));
+
+	input_sync(dev->idev);
 }
 
 static void int_in_callback(struct urb *urb)
@@ -86,12 +110,35 @@ static void int_in_callback(struct urb *urb)
 	usb_submit_urb(dev->int_in_urb, GFP_ATOMIC);
 }
 
+static int start_input(struct usb_skel *dev)
+{
+	int retval;
+
+	/* Filling interrupt out urb */
+	printk(KERN_INFO "[~] Submitting the interrupt in urb\n");
+	usb_fill_int_urb(dev->int_in_urb,
+			 dev->udev,
+	                 usb_rcvintpipe(dev->udev, dev->int_in_endpoint->bEndpointAddress),
+	                 dev->int_in_buffer,
+	                 le16_to_cpu(dev->int_in_endpoint->wMaxPacketSize),
+	                 int_in_callback,
+	                 dev,
+	                 dev->int_in_endpoint->bInterval);
+
+	retval = usb_submit_urb(dev->int_in_urb, GFP_ATOMIC);
+
+	/* An urb is already submitted */
+	if (retval != 0)
+		printk(KERN_INFO "[!] Error while submitting the in urb\n");
+
+	return retval;
+}
+
 static int skel_open(struct inode *inode, struct file *file)
 {
 	struct usb_skel *dev;
 	struct usb_interface *interface;
 	int subminor;
-	int retval = 0;
 	
 	printk(KERN_INFO "[~] Opening the device for I/O\n");
 	subminor = iminor(inode);
@@ -113,24 +160,7 @@ static int skel_open(struct inode *inode, struct file *file)
 
 	// printk(KERN_INFO "%d\n", refcount_read(&(&dev->kref)->refcount));
 
-	/* Filling interrupt out urb */
-	printk(KERN_INFO "[~] Submitting the interrupt in urb\n");
-	usb_fill_int_urb(dev->int_in_urb,
-			 dev->udev,
-	                 usb_rcvintpipe(dev->udev, dev->int_in_endpoint->bEndpointAddress),
-	                 dev->int_in_buffer,
-	                 le16_to_cpu(dev->int_in_endpoint->wMaxPacketSize),
-	                 int_in_callback,
-	                 dev,
-	                 dev->int_in_endpoint->bInterval);
-
-	retval = usb_submit_urb(dev->int_in_urb, GFP_ATOMIC);
-
-	/* An urb is already submitted */
-	if (retval != 0)
-		printk(KERN_INFO "[!] Error while submitting the in urb\n");
-
-	return 0;
+	return start_input(dev);
 }
 
 #define to_skel_dev(d) container_of(d, struct usb_skel, kref)
@@ -257,12 +287,6 @@ static int error_handler(struct usb_skel **u_dev)
 	return -1;
 }
 
-static int init_input(struct usb_skel **gdev)
-{
-	struct usb_skel *dev = *gdev;
-	return 0;
-}
-
 static int skel_probe(struct usb_interface *interface, const struct usb_device_id *id)
 {
 	struct usb_skel 		*dev;
@@ -288,7 +312,8 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	dev->interface = interface;
 
 	/* Init input structure */
-	printk(KERN_INFO "[~] Allocating input device\n");
+	printk(KERN_INFO "[~] Allocating input device\n"); /* ls /sys/class/input */
+							   /* ls /dev/input */
 	input_dev = input_allocate_device();
 	if (!input_dev) {
 		printk(KERN_INFO "[!] Can't allocate input device\n");
@@ -301,18 +326,31 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	input_dev->name = "BDA Controller";
 	input_dev->phys = dev->phys;
 
-	usb_make_path(dev->udev, dev->phys, sizeof(dev->phys));
-	strlcat(dev->phys, "/BDAinput", sizeof(dev->phys));
+	// usb_make_path(dev->udev, dev->phys, sizeof(dev->phys));
+	// strlcat(dev->phys, "/input0", sizeof(dev->phys));
 
 	input_dev->id.vendor = USB_SKEL_VENDOR_ID;
 	input_dev->id.product = USB_SKEL_PRODUCT_ID;
 
 	usb_to_input_id(dev->udev, &input_dev->id);
-	for (i = 0; common_btn[i] >= 0; i++)
-		input_set_capability(input_dev, EV_KEY, common_btn[i]);
+	for (i = 0; bda_buttons[i] >= 0; i++)
+		input_set_capability(input_dev, EV_KEY, bda_buttons[i]);
+
+	for (i = 0; bda_sbuttons[i] >= 0; i++)
+		input_set_capability(input_dev, EV_KEY, bda_sbuttons[i]);
+
+	for (i = 0; bda_triggers[i] >= 0; i++)
+		input_set_capability(input_dev, EV_KEY, bda_triggers[i]);
+
+	for (i = 0; bda_dpad[i] >= 0; i++)
+		input_set_capability(input_dev, EV_KEY, bda_dpad[i]);
+
+	printk(KERN_INFO "Registering input device\n");
 	retval = input_register_device(dev->idev);
+
 	if (retval) {
 		printk(KERN_INFO "[!] Can't register input device\n");
+		/* TODO: If function fails the device must be freed with input_free_device */
 		return error_handler(&dev);
 	}
 
@@ -381,6 +419,9 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 		return error_handler(&dev);
 	}
 	printk(KERN_INFO "[+][+][+] USB skeleton device attached to minor: usb/skel%d.\n", interface->minor);
+
+	// start_input(dev);
+
 	return 0;
 }
 
@@ -416,7 +457,7 @@ static void skel_disconnect(struct usb_interface *interface)
 }
 
 static struct usb_driver skel_driver = {
-	.name =		"skeleton",
+	.name =		"BDA Controller",
 	.probe =	skel_probe,
 	.disconnect =	skel_disconnect,
 	.id_table =	skel_table,
