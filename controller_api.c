@@ -11,11 +11,23 @@
 
 static volatile int stop = 0;
 
-void 	printBits(unsigned int num)
+void 	print_bits(uint64_t num, int fieldwidth)
 {
-	for(int bit=0;bit<(sizeof(unsigned int) * 8); bit++) {
-		printf("%i", num & 0x01);
-		num = num >> 1;
+	uint64_t temp = num;
+	int len = 0;
+
+	while (temp > 0) {
+		len++;
+		temp >>= 1;
+	}
+
+	len &= ~(fieldwidth-1);
+	len += fieldwidth;
+
+	while (len) {
+		printf("%d", (num >> --len) & 0x01);
+		if (len % 4 == 0)
+			printf(" ");
 	}
 	printf("\n");
 }
@@ -28,9 +40,15 @@ void	sig_handler(int signal)
 void	handle_event(uint64_t data)
 {
 	// int pos = 0;
-	printf("data: 0x%lx\n", data);
+	printf("\n__________PACKET__________\n");
+
+	printf("Data: ");
 	// printf("bit %d is %s\n", pos, CHECK_BIT(data, pos) ? "set":"not set");
-	printBits(data);
+	print_bits(data, 64);
+	printf("D-Pad: 0x%x, binary: ", (data & 0xF0000)>>16); // 11110000000000000000
+	print_bits((data & 0xF0000)>>16, 8);
+
+	printf("__________________________\n");
 }
 
 int 	main(int argc, char **argv)

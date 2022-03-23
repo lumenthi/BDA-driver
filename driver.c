@@ -54,6 +54,7 @@ static const signed short bda_sbuttons[] = {BTN_MODE,BTN_START,BTN_SELECT,BTN_EX
 /* Triggers */
 static const signed short bda_triggers[] = {BTN_TL,BTN_TR,BTN_TL2,BTN_TR2,-1};
 /* D-Pad */
+/*					     UP                RIGHT              DOWN                LEFT */
 static const signed short bda_dpad[] = {BTN_TRIGGER_HAPPY1,BTN_TRIGGER_HAPPY2,BTN_TRIGGER_HAPPY3,BTN_TRIGGER_HAPPY4, -1};
 
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
@@ -76,6 +77,18 @@ static void process_packet(struct usb_skel *dev, struct urb *urb, unsigned char 
 	input_report_key(dev->idev, BTN_TR2, CHECK_BIT(*(uint64_t*)data, 7));
 
 	/* Reporting D-PAD */
+	input_report_key(dev->idev, BTN_TRIGGER_HAPPY1, ((*(uint64_t*)data & 0xF0000)>>16 == 0x0 ||
+							 (*(uint64_t*)data & 0xF0000)>>16 == 0x1 ||
+							 (*(uint64_t*)data & 0xF0000)>>16 == 0x7));
+	input_report_key(dev->idev, BTN_TRIGGER_HAPPY2, ((*(uint64_t*)data & 0xF0000)>>16 == 0x1 ||
+							 (*(uint64_t*)data & 0xF0000)>>16 == 0x2 ||
+							 (*(uint64_t*)data & 0xF0000)>>16 == 0x3));
+	input_report_key(dev->idev, BTN_TRIGGER_HAPPY3, ((*(uint64_t*)data & 0xF0000)>>16 == 0x3 ||
+							 (*(uint64_t*)data & 0xF0000)>>16 == 0x4 ||
+							 (*(uint64_t*)data & 0xF0000)>>16 == 0x5));
+	input_report_key(dev->idev, BTN_TRIGGER_HAPPY4, ((*(uint64_t*)data & 0xF0000)>>16 == 0x5 ||
+							 (*(uint64_t*)data & 0xF0000)>>16 == 0x6 ||
+							 (*(uint64_t*)data & 0xF0000)>>16 == 0x7));
 
 	/* Reporting special buttons */
 	input_report_key(dev->idev, BTN_SELECT, CHECK_BIT(*(uint64_t*)data, 8));
