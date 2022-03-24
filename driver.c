@@ -53,6 +53,10 @@ static const signed short bda_buttons[] = {BTN_A,BTN_B,BTN_X,BTN_Y,-1};
 static const signed short bda_sbuttons[] = {BTN_MODE,BTN_START,BTN_SELECT,BTN_EXTRA,-1};
 /* Triggers */
 static const signed short bda_triggers[] = {BTN_TL,BTN_TR,BTN_TL2,BTN_TR2,-1};
+/* Joysticks */
+static const signed short bda_joysticks[] = {ABS_X, ABS_Y,ABS_RX, ABS_RY,-1};
+/* Joysticks Buttons */
+static const signed short bda_jbuttons[] = {BTN_THUMBL,BTN_THUMBR,-1};
 /* D-Pad */
 /*					     UP                RIGHT              DOWN                LEFT */
 static const signed short bda_dpad[] = {BTN_TRIGGER_HAPPY1,BTN_TRIGGER_HAPPY2,BTN_TRIGGER_HAPPY3,BTN_TRIGGER_HAPPY4, -1};
@@ -63,6 +67,12 @@ static void process_packet(struct usb_skel *dev, struct urb *urb, unsigned char 
 {
 
 	// printk(KERN_INFO "[~] Processing packet: 0x%llx\n", *(uint64_t*)data);
+
+	/* Reporting joysticks axis */
+	input_report_abs(dev->idev, ABS_X, ((*(uint64_t*)data>>24) & 0xFF));
+	input_report_abs(dev->idev, ABS_Y, ((*(uint64_t*)data>>32) & 0xFF));
+	input_report_abs(dev->idev, ABS_RX, ((*(uint64_t*)data>>40) & 0xFF));
+	input_report_abs(dev->idev, ABS_RY, ((*(uint64_t*)data>>48) & 0xFF));
 
 	/* Reporting common buttons */
 	input_report_key(dev->idev, BTN_Y, CHECK_BIT(*(uint64_t*)data, 0));
@@ -75,6 +85,10 @@ static void process_packet(struct usb_skel *dev, struct urb *urb, unsigned char 
 	input_report_key(dev->idev, BTN_TR, CHECK_BIT(*(uint64_t*)data, 5));
 	input_report_key(dev->idev, BTN_TL2, CHECK_BIT(*(uint64_t*)data, 6));
 	input_report_key(dev->idev, BTN_TR2, CHECK_BIT(*(uint64_t*)data, 7));
+
+	/* Reporting joysticks buttons */
+	input_report_key(dev->idev, BTN_THUMBL, CHECK_BIT(*(uint64_t*)data, 10));
+	input_report_key(dev->idev, BTN_THUMBR, CHECK_BIT(*(uint64_t*)data, 11));
 
 	/* Reporting D-PAD */
 	input_report_key(dev->idev, BTN_TRIGGER_HAPPY1, ((*(uint64_t*)data & 0xF0000)>>16 == 0x0 ||
@@ -339,13 +353,14 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 	input_dev->name = "BDA Controller";
 	input_dev->phys = dev->phys;
 
-	// usb_make_path(dev->udev, dev->phys, sizeof(dev->phys));
-	// strlcat(dev->phys, "/input0", sizeof(dev->phys));
-
 	input_dev->id.vendor = USB_SKEL_VENDOR_ID;
 	input_dev->id.product = USB_SKEL_PRODUCT_ID;
 
 	usb_to_input_id(dev->udev, &input_dev->id);
+
+	for (i = 0; bda_joysticks[i] >= 0; i++)
+		input_set_abs_params(input_dev, bda_joysticks[i], 0x0, 0xff, 0, 0);
+
 	for (i = 0; bda_buttons[i] >= 0; i++)
 		input_set_capability(input_dev, EV_KEY, bda_buttons[i]);
 
@@ -354,6 +369,9 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 
 	for (i = 0; bda_triggers[i] >= 0; i++)
 		input_set_capability(input_dev, EV_KEY, bda_triggers[i]);
+
+	for (i = 0; bda_jbuttons[i] >= 0; i++)
+		input_set_capability(input_dev, EV_KEY, bda_jbuttons[i]);
 
 	for (i = 0; bda_dpad[i] >= 0; i++)
 		input_set_capability(input_dev, EV_KEY, bda_dpad[i]);

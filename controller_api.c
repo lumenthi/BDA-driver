@@ -39,14 +39,23 @@ void	sig_handler(int signal)
 
 void	handle_event(uint64_t data)
 {
-	// int pos = 0;
 	printf("\n__________PACKET__________\n");
 
 	printf("Data: ");
-	// printf("bit %d is %s\n", pos, CHECK_BIT(data, pos) ? "set":"not set");
 	print_bits(data, 64);
-	printf("D-Pad: 0x%x, binary: ", (data & 0xF0000)>>16); // 11110000000000000000
+
+	printf("D-Pad: 0x%x, binary: ", (data & 0xF0000)>>16); // 1111 0000 0000 0000 0000
 	print_bits((data & 0xF0000)>>16, 8);
+
+	printf("Left Joystick X axis: 0x%2x, binary: ", (data>>24) & 0xFF);
+	print_bits((data>>24) & 0xFF, 16);
+	printf("Left Joystick Y axis: 0x%2x, binary: ", (data>>32) & 0xFF);
+	print_bits((data>>32) & 0xFF, 16);
+
+	printf("Right Joystick X axis: 0x%2x, binary: ", (data>>40) & 0xFF);
+	print_bits((data>>40) & 0xFF, 16);
+	printf("Right Joystick Y axis: 0x%2x, binary: ", (data>>48) & 0xFF);
+	print_bits((data>>48) & 0xFF, 16);
 
 	printf("__________________________\n");
 }
