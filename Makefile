@@ -21,13 +21,13 @@ unload:
 reload: unload all load
 
 log:
-	sudo tail -F /var/log/messages
+	sudo dmesg --level=debug --follow
 
 read:
-	sudo cat /dev/usb/skel0 | xxd #We assume that we are skel0
+	sudo cat sudo cat /dev/input/js0 | xxd -b
 
 api:
 	gcc controller_api.c -o api_tests && ./api_tests
 
 jstest:
-	bash test.sh
+	jstest /dev/input/js0
