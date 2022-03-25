@@ -238,11 +238,11 @@ static int bda_suspend(struct usb_interface *intf, pm_message_t message)
 	idev = dev->idev;
 
 	if (idev->users) {
-		printk(KERN_DEBUG "[-] Starting the input\n");
-		stop_input(dev);
+		printk(KERN_DEBUG "[-] Stopping the input\n");
+		return stop_input(dev);
 	}
 
-	return start_input(dev);
+	return 0;
 }
 
 static int bda_resume(struct usb_interface *intf)
@@ -252,9 +252,10 @@ static int bda_resume(struct usb_interface *intf)
 
 	dev = usb_get_intfdata(intf);
 	idev = dev->idev;
+
 	if (idev->users) {
-		printk(KERN_DEBUG "[-] Stopping the input\n");
-		stop_input(dev);
+		printk(KERN_DEBUG "[-] Starting the input\n");
+		return start_input(dev);
 	}
 	return 0;
 }
@@ -364,12 +365,12 @@ static int bda_probe(struct usb_interface *interface, const struct usb_device_id
 	for (i = 0; bda_dpad[i] >= 0; i++)
 		input_set_capability(input_dev, EV_KEY, bda_dpad[i]);
 
-	printk(KERN_DEBUG "Registering input device\n");
+	printk(KERN_DEBUG "[~] Registering input device\n");
 	retval = input_register_device(dev->idev);
 
 	if (retval) {
 		printk(KERN_DEBUG "[!] Can't register input device\n");
-		/* TODO: If function fails the device must be freed with input_free_device */
+		input_free_device(dev->idev);
 		return error_handler(&dev);
 	}
 
