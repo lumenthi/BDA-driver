@@ -2,62 +2,27 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <signal.h>
-#include <fcntl.h>
+#include <stdlib.h>
 
-#define MAXPACKETSIZE 64 // 64 bytes -> lsusb.txt
-#define DEVICE_PATH "/dev/usb/skel0" // TODO: device identification
+#include "controller.h"
 
-#define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
+volatile static int stop = 0;
+void (*init_functions[2]) (uint8_t button);
 
-static volatile int stop = 0;
-
-void 	print_bits(uint64_t num, int fieldwidth)
+static void	sig_handler(int signal)
 {
-	uint64_t temp = num;
-	int len = 0;
-
-	while (temp > 0) {
-		len++;
-		temp >>= 1;
-	}
-
-	len &= ~(fieldwidth-1);
-	len += fieldwidth;
-
-	while (len) {
-		printf("%d", (num >> --len) & 0x01);
-		if (len % 4 == 0)
-			printf(" ");
-	}
-	printf("\n");
-}
-
-void	sig_handler(int signal)
-{
+	printf("\nCaught signal, interrupting execution.\n");
 	stop = 1;
 }
 
-void	handle_event(uint64_t data)
+static void	handle_event(t_controller controller)
 {
-	printf("\n__________PACKET__________\n");
+	printf("\n======EVENT======\n");
 
-	printf("Data: ");
-	print_bits(data, 64);
+	printf("time: 0x%x\nvalue: 0x%x\ntype: 0x%x\nnumber: 0x%x\n",
+		controller.time, controller.value, controller.type, controller.number);
 
-	printf("D-Pad: 0x%x, binary: ", (data & 0xF0000)>>16); // 1111 0000 0000 0000 0000
-	print_bits((data & 0xF0000)>>16, 8);
-
-	printf("Left Joystick X axis: 0x%2x, binary: ", (data>>24) & 0xFF);
-	print_bits((data>>24) & 0xFF, 16);
-	printf("Left Joystick Y axis: 0x%2x, binary: ", (data>>32) & 0xFF);
-	print_bits((data>>32) & 0xFF, 16);
-
-	printf("Right Joystick X axis: 0x%2x, binary: ", (data>>40) & 0xFF);
-	print_bits((data>>40) & 0xFF, 16);
-	printf("Right Joystick Y axis: 0x%2x, binary: ", (data>>48) & 0xFF);
-	print_bits((data>>48) & 0xFF, 16);
-
-	printf("__________________________\n");
+	printf("=================\n");
 }
 
 int 	main(int argc, char **argv)
@@ -65,27 +30,16 @@ int 	main(int argc, char **argv)
 	(void)argc;
 	(void)argv;
 
-	int fd;
-	uint64_t nb;
-
-	char buf[MAXPACKETSIZE];
-	char oldbuf[MAXPACKETSIZE];
+	unsigned long int server_tid;
+	stop = 0;
 
 	signal(SIGINT, sig_handler);
 
-	fd = open(DEVICE_PATH, O_RDONLY | O_NDELAY);
-	if (fd == -1) {
-		fprintf(stderr, "%s", "Can't open the device handle.\n");
-		return 1;
-	}
-	while (!stop && (nb = read(fd, buf, MAXPACKETSIZE))) {
-		if (*(uint64_t*)buf != *(uint64_t*)oldbuf) {
-			handle_event(*(uint64_t*)buf);
-			*(uint64_t*)oldbuf = *(uint64_t*)buf;
-		}
-	}
-	if (close(fd) < 0)
-		fprintf(stderr, "%s", "Close failed.\n");
-	printf("\nCaught signal, interrupting execution.\n");
+	server_tid = new_controller_server(handle_event);
+
+	while(!stop);
+
+	stop_controller_server(server_tid);
+
 	return 0;
 }
