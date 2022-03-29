@@ -26,8 +26,8 @@ log:
 read:
 	sudo cat sudo cat /dev/input/js0 | xxd -b
 
-api:
-	gcc -pthread controller_api.c controller.c -o api_tests && ./api_tests
+main:
+	gcc -pthread main.c controller.c -o api_tests && ./api_tests
 
 jstest:
 	jstest /dev/input/js0

@@ -4,7 +4,7 @@
 #include <pthread.h>
 #include <linux/joystick.h>
 
-/*
+/* Joystick API
 
 struct js_event {
 	__u32 time;     		* event timestamp in milliseconds *
@@ -37,6 +37,29 @@ struct js_event {
 #define BUTTON_B 		0x01
 #define BUTTON_X 		0x02
 #define BUTTON_Y 		0x03
+
+#define TRIGGER_LEFT		0x04
+#define TRIGGER_RIGHT		0x05
+#define TRIGGER2_LEFT		0x06
+#define TRIGGER2_RIGHT		0x07
+
+#define LESS			0x08
+#define PLUS			0x09
+#define HOME			0x0A
+#define SCREENSHOT		0x11
+
+#define DPAD_UP			0x0D
+#define DPAD_RIGHT		0x0E
+#define DPAD_BOTTOM		0x0F
+#define DPAD_LEFT		0x10
+
+#define BUTTON_JOYSTICK_LEFT	0x0B
+#define BUTTON_JOYSTICK_RIGHT	0x0C
+
+#define X_JOYSTICK_LEFT		0x00
+#define Y_JOYSTICK_LEFT		0x01
+#define X_JOYSTICK_RIGHT	0x02
+#define Y_JOYSTICK_RIGHT	0x03
 
 typedef struct js_event		t_controller;
 

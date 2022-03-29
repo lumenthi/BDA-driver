@@ -13,7 +13,6 @@ void	stop_controller_server(pthread_t thread_id)
 	pthread_cancel(thread_id);
 	if (fd != -1 && close(fd) < 0)
 		fprintf(stderr, "%s", "Close failed.\n");
-	printf("Stopped joystick server\n");
 }
 
 static void *start_controller_server(void *args)
