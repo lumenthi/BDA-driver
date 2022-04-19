@@ -20,14 +20,20 @@ unload:
 
 reload: unload all load
 
-log:
+debug-log:
 	sudo dmesg --level=debug --follow
+
+log:
+	sudo tail -F /var/log/messages
 
 read:
 	sudo cat sudo cat /dev/input/js0 | xxd -b
 
-main:
+run:
 	gcc -pthread main.c controller.c -o api_tests && ./api_tests
 
 jstest:
 	jstest /dev/input/js0
+
+evtest:
+	sudo evtest

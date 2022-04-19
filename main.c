@@ -127,11 +127,13 @@ int 	main(int argc, char **argv)
 	unsigned long int server_tid;
 
 	signal(SIGINT, sig_handler);
-
 	server_tid = new_controller_server(handle_event);
+	printf("%s%s%s%s%s%s%s",
+		"============================================\n",
+		"Testing controller, press ", RED, "CTRL+C", DEFAULT, " to stop...\n"
+		"============================================\n");
 
 	while(!stop);
-
 	stop_controller_server(server_tid);
 
 	return 0;

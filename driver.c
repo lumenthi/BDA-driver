@@ -64,7 +64,7 @@ static const signed short bda_dpad[] = {BTN_TRIGGER_HAPPY1,BTN_TRIGGER_HAPPY2,BT
 /***********************************************************************/
 /*			DEBUG FUNCTIONS		       		       */
 
-/*uint64_t old_data = 0;
+uint64_t old_data = 0;
 
 void 	print_bits(uint64_t num, int fieldwidth)
 {
@@ -113,7 +113,7 @@ static void debug_packet(uint64_t data)
 	printk(KERN_INFO "__________________________\n");
 
 	old_data = data;
-}*/
+}
 
 /*							               */
 /***********************************************************************/
@@ -313,6 +313,8 @@ static int bda_probe(struct usb_interface *interface, const struct usb_device_id
 	int 				i;
 	int 				retval = -ENOMEM;
 
+	(void)debug_packet;
+
 	printk(KERN_DEBUG "[+][+][+] Device plugged in.\n");
 
 	/* Allocate memory for our device state and initialize it */
@@ -333,7 +335,6 @@ static int bda_probe(struct usb_interface *interface, const struct usb_device_id
 	input_dev = input_allocate_device();
 	if (!input_dev) {
 		printk(KERN_DEBUG "[!] Can't allocate input device\n");
-		/* TODO: Handle input_structure idev in error handler */
 		return error_handler(&dev);
 	}
 
@@ -436,8 +437,6 @@ static int bda_probe(struct usb_interface *interface, const struct usb_device_id
 
 	return 0;
 }
-
-
 
 static void bda_disconnect(struct usb_interface *interface)
 {
